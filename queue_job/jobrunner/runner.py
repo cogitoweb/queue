@@ -210,6 +210,15 @@ class Database(object):
     def __init__(self, db_name):
         self.db_name = db_name
         connection_info = odoo.sql_db.connection_info_for(db_name)[1]
+        # TODO
+        # get port for configuration parameter
+        # 
+        # here we force a different port from the
+        # default one to allow use of pgbouncer
+        # in transaction mode instead of session
+        # 
+        connection_info['port'] = '5432'
+        # end of patch
         self.conn = psycopg2.connect(**connection_info)
         self.conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         self.has_queue_job = self._has_queue_job()
