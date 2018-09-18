@@ -227,7 +227,7 @@
         <field name="name">queue.job.function.form</field>
         <field name="model">queue.job.function</field>
         <field name="arch" type="xml">
-            <form string="Job Functions" create="false" delete="false">
+            <form string="Job Functions" create="false">
                 <group>
                     <field name="name" readonly="1"/>
                     <field name="channel_id"/>
@@ -240,7 +240,7 @@
         <field name="name">queue.job.function.tree</field>
         <field name="model">queue.job.function</field>
         <field name="arch" type="xml">
-            <tree string="Job Functions" create="false" delete="false">
+            <tree string="Job Functions" create="false">
                 <field name="name"/>
                 <field name="channel_id"/>
             </tree>

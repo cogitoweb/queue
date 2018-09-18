@@ -335,7 +335,7 @@ class QueueJobRunner(object):
         for job in self.channel_manager.get_jobs_to_run(now):
             if self._stop:
                 break
-            _logger.info("asking Odoo to run job %s on db %s",
+            _logger.debug("asking Odoo to run job %s on db %s",
                          job.uuid, job.db_name)
             self.db_by_name[job.db_name].set_job_enqueued(job.uuid)
             _async_http_get(self.port, job.db_name, job.uuid)
