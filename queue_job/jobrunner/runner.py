@@ -135,6 +135,7 @@ from .channels import ChannelManager, PENDING, ENQUEUED, NOT_DONE
 SELECT_TIMEOUT = 60
 ERROR_RECOVERY_DELAY = 5
 
+logging.getLogger("requests").setLevel(logging.WARNING)
 _logger = logging.getLogger(__name__)
 
 
