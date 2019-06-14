@@ -155,7 +155,7 @@ class QueueJob(models.Model):
     @api.multi
     def button_done_with_response(self):
 
-        tot = len(self.filtered(lambda x: x.state != 'DONE'))
+        tot = len(self.filtered(lambda x: x.state != 'done'))
 
         self.button_done()
         
