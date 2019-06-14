@@ -157,6 +157,25 @@
         </field>
     </record>
 
+    <!-- START multi set to done action -->
+    <record id="action_done_queue_job" model="ir.actions.server">
+        <field name="name">Set to Done</field>
+        <field name="model_id" ref="model_queue_job"/>
+        <field name="state">code</field>
+        <field name="code">
+            action = env['queue.job'].browse(context.get('active_ids', [])).button_done()
+        </field>
+    </record>
+
+    <record id="action_done_queue_job_menu" model="ir.values">
+        <field name="name">Set to Done</field>
+        <field name="model">queue.job</field>
+        <field name="key">action</field>
+        <field name="key2">client_action_multi</field>
+        <field name="value" eval="'ir.actions.server,%d' % action_done_queue_job" />
+    </record>
+    <!-- END multi set to done action -->
+
     <record id="action_requeue_job" model="ir.actions.act_window">
         <field name="name">Requeue Jobs</field>
         <field name="res_model">queue.requeue.job</field>
