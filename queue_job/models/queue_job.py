@@ -148,7 +148,29 @@ class QueueJob(models.Model):
     def button_done(self):
         result = _('Manually set to done by %s') % self.env.user.name
         self._change_job_state(DONE, result=result)
+
         return True
+
+    # proxy to multiple action
+    @api.multi
+    def button_done_with_response(self):
+
+        tot = len(self.filtered(lambda x: x.state != 'DONE'))
+
+        self.button_done()
+        
+        return {
+            'type': 'ir.actions.act_window.message',
+            'title': _('Message'),
+            'message': _('%s jobs setted to done') % tot,
+            'close_button_title': False,
+            'buttons': [
+                {
+                    'type': 'ir.actions.act_window_close',
+                    'name': _('Close')
+                }
+            ]
+        }
 
     @api.multi
     def requeue(self):
