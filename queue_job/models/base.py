@@ -3,9 +3,13 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import inspect
+import logging
+import os
 
 from odoo import models, api
 from ..job import DelayableRecordset
+
+_logger = logging.getLogger(__name__)
 
 
 class Base(models.AbstractModel):
@@ -16,9 +20,11 @@ class Base(models.AbstractModel):
     def _register_hook(self):
         """ register marked jobs """
         super(Base, self)._register_hook()
-        job_methods = [method for __, method
-                       in inspect.getmembers(self, predicate=inspect.ismethod)
-                       if getattr(method, 'delayable', None)]
+        job_methods = [
+            method for __, method
+            in inspect.getmembers(self.__class__, predicate=inspect.ismethod)
+            if getattr(method, 'delayable', None)
+        ]
         for job_method in job_methods:
             self.env['queue.job.function']._register_job(job_method)
         # add_to_job_registry(job_methods)
@@ -26,7 +32,7 @@ class Base(models.AbstractModel):
     @api.multi
     def with_delay(self, priority=None, eta=None,
                    max_retries=None, description=None,
-                   channel=None):
+                   channel=None, identity_key=None):
         """ Return a ``DelayableRecordset``
 
         The returned instance allow to enqueue any method of the recordset's
@@ -38,7 +44,6 @@ class Base(models.AbstractModel):
 
         In the line above, in so far ``write`` is allowed to be delayed with
         ``@job``, the write will be executed in an asynchronous job.
-
 
         :param priority: Priority of the job, 0 being the higher priority.
                          Default is 10.
@@ -52,12 +57,35 @@ class Base(models.AbstractModel):
         :param channel: the complete name of the channel to use to process
                         the function. If specified it overrides the one
                         defined on the function
+        :param identity_key: key uniquely identifying the job, if specified
+                             and a job with the same key has not yet been run,
+                             the new job will not be added.
         :return: instance of a DelayableRecordset
         :rtype: :class:`odoo.addons.queue_job.job.DelayableRecordset`
 
+        Note for developers: if you want to run tests or simply disable
+        jobs queueing for debugging purposes, you can:
+
+            a. set the env var `TEST_QUEUE_JOB_NO_DELAY=1`
+            b. pass a ctx key `test_queue_job_no_delay=1`
+
+        In tests you'll have to mute the logger like:
+
+            @mute_logger('odoo.addons.queue_job.models.base')
         """
+        if os.getenv('TEST_QUEUE_JOB_NO_DELAY'):
+            _logger.warn(
+                '`TEST_QUEUE_JOB_NO_DELAY` env var found. NO JOB scheduled.'
+            )
+            return self
+        if self.env.context.get('test_queue_job_no_delay'):
+            _logger.warn(
+                '`test_queue_job_no_delay` ctx key found. NO JOB scheduled.'
+            )
+            return self
         return DelayableRecordset(self, priority=priority,
                                   eta=eta,
                                   max_retries=max_retries,
                                   description=description,
-                                  channel=channel)
+                                  channel=channel,
+                                  identity_key=identity_key)

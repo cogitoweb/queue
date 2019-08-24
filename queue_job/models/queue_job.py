@@ -27,6 +27,7 @@ class QueueJob(models.Model):
     _order = 'date_created DESC, date_done DESC'
 
     _removal_interval = 5  # days
+    _default_related_action = 'related_action_open_record'
 
     uuid = fields.Char(string='UUID',
                        readonly=True,
@@ -83,6 +84,21 @@ class QueueJob(models.Model):
                           store=True,
                           index=True)
 
+    identity_key = fields.Char()
+
+    @api.model_cr
+    def init(self):
+        self._cr.execute(
+            'SELECT indexname FROM pg_indexes WHERE indexname = %s ',
+            ('queue_job_identity_key_state_partial_index',)
+        )
+        if not self._cr.fetchone():
+            self._cr.execute(
+                "CREATE INDEX queue_job_identity_key_state_partial_index "
+                "ON queue_job (identity_key) WHERE state in ('pending', "
+                "'enqueued') AND identity_key IS NOT NULL;"
+            )
+
     @api.multi
     def _inverse_channel(self):
         self.filtered(lambda a: not a.channel)._compute_channel()
@@ -126,7 +142,7 @@ class QueueJob(models.Model):
         job = Job.load(self.env, self.uuid)
         action = job.related_action()
         if action is None:
-            raise exceptions.Warning(_('No action available for this job'))
+            raise exceptions.UserError(_('No action available for this job'))
         return action
 
     @api.multi
@@ -145,8 +161,14 @@ class QueueJob(models.Model):
             job_.store()
 
     @api.multi
-    def button_done(self):
-        result = _('Manually set to done by %s') % self.env.user.name
+    def action_done(self, reason=None):
+        result = _(
+            u"Manually set to done by {}"
+        ).format(self.env.user.name)
+        if reason:
+            result = _(
+                u"{} with reason: {}"
+            ).format(result, reason)
         self._change_job_state(DONE, result=result)
 
         return True
@@ -171,6 +193,18 @@ class QueueJob(models.Model):
                 }
             ]
         }
+
+    @api.multi
+    def button_done(self):
+        _logger.warning('deprecated, replaced by action_done()')
+        return self.action_done()
+
+    @api.multi
+    def button_done_ask_reason(self):
+        action = self.env.ref(
+            'queue_job.action_set_jobs_done'
+        ).read()[0]
+        return action
 
     @api.multi
     def requeue(self):
@@ -248,6 +282,40 @@ class QueueJob(models.Model):
 
         return True
 
+    @api.multi
+    def related_action_open_record(self):
+        """Open a form view with the record(s) of the job.
+
+        For instance, for a job on a ``product.product``, it will open a
+        ``product.product`` form view with the product record(s) concerned by
+        the job. If the job concerns more than one record, it opens them in a
+        list.
+
+        This is the default related action.
+
+        """
+        self.ensure_one()
+        model_name = self.model_name
+        records = self.env[model_name].browse(self.record_ids).exists()
+        if not records:
+            return None
+        action = {
+            'name': _('Related Record'),
+            'type': 'ir.actions.act_window',
+            'view_type': 'form',
+            'view_mode': 'form',
+            'res_model': records._name,
+        }
+        if len(records) == 1:
+            action['res_id'] = records.id
+        else:
+            action.update({
+                'name': _('Related Records'),
+                'view_mode': 'tree,form',
+                'domain': [('id', 'in', records.ids)],
+            })
+        return action
+
 
 class RequeueJob(models.TransientModel):
     _name = 'queue.requeue.job'
@@ -270,6 +338,20 @@ class RequeueJob(models.TransientModel):
     def requeue(self):
         jobs = self.job_ids
         jobs.requeue()
+        return {'type': 'ir.actions.act_window_close'}
+
+
+class SetJobsToDone(models.TransientModel):
+    _inherit = 'queue.requeue.job'
+    _name = 'queue.jobs.to.done'
+    _description = 'Set all selected jobs to done'
+
+    reason = fields.Text(string='Reason to set to done')
+
+    @api.multi
+    def set_done(self):
+        jobs = self.job_ids
+        jobs.action_done(reason=self.reason)
         return {'type': 'ir.actions.act_window_close'}
 
 
@@ -299,8 +381,8 @@ class JobChannel(models.Model):
     @api.depends('name', 'parent_id.complete_name')
     def _compute_complete_name(self):
         for record in self:
-            # if not record.name:
-            #     return  # new record
+            if not record.name:
+                continue  # new record
             channel = record
             parts = [channel.name]
             while channel.parent_id:
