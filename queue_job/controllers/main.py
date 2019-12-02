@@ -103,9 +103,10 @@ class RunJobController(http.Controller):
             try:
                 self._try_perform_job(env, job)
             except OperationalError as err:
-                # Automatically retry the typical transaction serialization errors
                 # [cgt-edit] always raise to prevent infinite loop
                 raise
+
+                # Automatically retry the typical transaction serialization errors
                 # if err.pgcode not in PG_CONCURRENCY_ERRORS_TO_RETRY:
                 #     raise
 
