@@ -103,14 +103,15 @@ class RunJobController(http.Controller):
             try:
                 self._try_perform_job(env, job)
             except OperationalError as err:
-                # Automatically retry the typical transaction serialization
-                # errors
-                if err.pgcode not in PG_CONCURRENCY_ERRORS_TO_RETRY:
-                    raise
+                # Automatically retry the typical transaction serialization errors
+                # [cgt-edit] always raise to prevent infinite loop
+                raise
+                # if err.pgcode not in PG_CONCURRENCY_ERRORS_TO_RETRY:
+                #     raise
 
-                retry_postpone(job, tools.ustr(err.pgerror, errors='replace'),
-                               seconds=PG_RETRY)
-                _logger.debug('%s OperationalError, postponed', job)
+                # retry_postpone(job, tools.ustr(err.pgerror, errors='replace'),
+                #                seconds=PG_RETRY)
+                # _logger.debug('%s OperationalError, postponed', job)
 
         except NothingToDoJob as err:
             if unicode(err):
