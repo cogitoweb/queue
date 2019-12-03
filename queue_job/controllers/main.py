@@ -77,6 +77,24 @@ class RunJobController(http.Controller):
         """
         return ''
 
+    @http.route('/queue_job/notifyjob', type='http', auth="none")
+    def notifyjob(self, db, job_uuid):
+
+        global runner_thread
+        runner = runner_thread.runner
+
+        for key, value in runner.db_by_name.items():
+
+            if key == db:
+                job_datas = value.select_jobs('uuid = %s', (job_uuid,))
+
+                if job_datas:
+                    runner.channel_manager.notify(value.db_name, job_uuid)
+                else:
+                    runner.channel_manager.remove_job(uuid)
+
+        return ''
+
     @http.route('/queue_job/runjob', type='http', auth='none')
     def runjob(self, db, job_uuid, **kw):
         http.request.session.db = db
@@ -142,4 +160,4 @@ class RunJobController(http.Controller):
                     new_cr.commit()
             raise
 
-        return ""
+        return ''

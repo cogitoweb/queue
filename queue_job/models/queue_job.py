@@ -338,7 +338,6 @@ class QueueJob(models.Model):
             ('date_enqueued', '<', five_minutes_ago),
         ])
 
-
         for job in jobs_started:
             counter += 1
 
