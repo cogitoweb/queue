@@ -107,16 +107,15 @@
                 <field name="channel"/>
                 <field name="job_function_id"/>
                 <field name="company_id" groups="base.group_multi_company" widget="selection"/>
-                <filter name="pending" string="Pending"
-                    domain="[('state', '=', 'pending')]"/>
-                <filter name="enqueued" string="Enqueued"
-                    domain="[('state', '=', 'enqueued')]"/>
-                <filter name="started" string="Started"
-                    domain="[('state', '=', 'started')]"/>
-                <filter name="done" string="Done"
-                    domain="[('state', '=', 'done')]"/>
-                <filter name="failed" string="Failed"
-                    domain="[('state', '=', 'failed')]"/>
+
+                <filter name="pending" string="Pending" domain="[('state', '=', 'pending')]"/>
+                <filter name="enqueued" string="Enqueued" domain="[('state', '=', 'enqueued')]"/>
+                <filter name="started" string="Started" domain="[('state', '=', 'started')]"/>
+                <filter name="done" string="Done" domain="[('state', '=', 'done')]"/>
+                <filter name="failed" string="Failed" domain="[('state', '=', 'failed')]"/>
+                <separator/>
+                <filter string="Manually done" name="manually_done" domain="[('result', 'like', 'Manually set to done by')]" />
+
                 <group expand="0" string="Group By">
                     <filter string="Channel" context="{'group_by': 'channel'}" />
                     <filter string="Job Function" context="{'group_by': 'job_function_id'}" />
