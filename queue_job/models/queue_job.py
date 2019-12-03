@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from odoo import models, fields, api, exceptions, _
 
-from ..job import STATES, DONE, PENDING, Job
+from ..job import STATES, DONE, PENDING, ENQUEUED, Job
 from ..fields import JobSerialized
 
 _logger = logging.getLogger(__name__)
@@ -146,7 +146,7 @@ class QueueJob(models.Model):
         return action
 
     @api.multi
-    def _change_job_state(self, state, result=None):
+    def _change_job_state(self, state, result=None, reset_retry=True):
         """ Change the state of the `Job` object itself so it
         will change the other fields (date, result, ...)
         """
@@ -155,7 +155,7 @@ class QueueJob(models.Model):
             if state == DONE:
                 job_.set_done(result=result)
             elif state == PENDING:
-                job_.set_pending(result=result)
+                job_.set_pending(result=result, reset_retry=reset_retry)
             else:
                 raise ValueError('State not supported: %s' % state)
             job_.store()
@@ -190,10 +190,34 @@ class QueueJob(models.Model):
         self._change_job_state(PENDING)
         return True
 
+    @api.model
+    def create(self, values):
+
+        # check global config
+        config_model = self.env['ir.config_parameter'].search(
+            [('key', '=', 'queue.job.tracking_enable')]
+        )
+        tracking_disable = False if config_model and config_model.value == 'True' else True
+
+        self = self.with_context(tracking_disable=tracking_disable)
+        res = super(Jit40Queuejob, self).create(values)
+
+        return res
+
     @api.multi
     def write(self, vals):
+
+        # check global config
+        config_model = self.env['ir.config_parameter'].search(
+            [('key', '=', 'queue.job.tracking_enable')]
+        )
+        tracking_disable = False if config_model and config_model.value == 'True' else True
+
+        self = self.with_context(tracking_disable=tracking_disable)
         res = super(QueueJob, self).write(vals)
-        if vals.get('state') == 'failed':
+
+        if vals.get('state') == 'failed' and not tracking_disable:
+
             # subscribe the users now to avoid to subscribe them
             # at every job creation
             domain = self._subscribe_users_domain()
@@ -294,6 +318,42 @@ class QueueJob(models.Model):
                 'domain': [('id', 'in', records.ids)],
             })
         return action
+
+    @api.multi
+    def requeue_freezed(self):
+        """ called from cron to renqueue or discard freezed jobs """
+
+        counter = 0
+
+        five_minutes_ago = (
+            datetime.datetime.now() - datetime.timedelta(minutes=5)
+        ).strftime(
+            DEFAULT_SERVER_DATETIME_FORMAT
+        )
+
+        jobs_started = self.env['queue.job'].search([
+            ('state', '=', ENQUEUED),
+            ('date_started', '<', five_minutes_ago),
+        ])
+
+
+        for job in jobs_started:
+            counter += 1
+
+            if job.retry < job.max_retries:
+                # we don't use requeue() to prevent reset retry counter
+                job._change_job_state(PENDING, False)
+                _logger.info("force requeue job id %s" % job.id)
+
+            else:
+                # force failed if not already
+                if job.state != 'failed':
+                    # call manually write because
+                    # there is no direct support on model
+                    job.write({'state': 'failed'})
+                    _logger.info("force to fail job id %s" % job.id)
+
+        return counter
 
 
 class RequeueJob(models.TransientModel):
