@@ -202,7 +202,7 @@ class QueueJob(models.Model):
         tracking_disable = False if config_model and config_model.value == 'True' else True
 
         self = self.with_context(tracking_disable=tracking_disable)
-        res = super(Jit40Queuejob, self).create(values)
+        res = super(QueueJob, self).create(values)
 
         return res
 
