@@ -333,7 +333,7 @@ class QueueJob(models.Model):
 
         jobs_started = self.env['queue.job'].search([
             ('state', '=', ENQUEUED),
-            ('date_started', '<', five_minutes_ago),
+            ('date_enqueued', '<', five_minutes_ago),
         ])
 
 
