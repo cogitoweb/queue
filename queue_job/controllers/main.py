@@ -105,7 +105,7 @@ class RunJobController(http.Controller):
             except OperationalError as err:
                 # [cgt-edit] always raise RetryableJobError
                 # to prevent infinite loop
-                raise RetryableJobError
+                raise RetryableJobError(err.pgerror)
 
                 # Automatically retry the typical transaction serialization errors
                 # if err.pgcode not in PG_CONCURRENCY_ERRORS_TO_RETRY:
