@@ -89,9 +89,9 @@ class RunJobController(http.Controller):
                 job_datas = value.select_jobs('uuid = %s', (job_uuid,))
 
                 if job_datas:
-                    runner.channel_manager.notify(value.db_name, job_uuid)
+                    runner.channel_manager.notify(key, job_uuid)
                 else:
-                    runner.channel_manager.remove_job(uuid)
+                    runner.channel_manager.remove_job(job_uuid)
 
         return ''
 
