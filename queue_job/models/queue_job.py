@@ -326,7 +326,7 @@ class QueueJob(models.Model):
         counter = 0
 
         five_minutes_ago = (
-            datetime.datetime.now() - datetime.timedelta(minutes=5)
+            datetime.now() - timedelta(minutes=5)
         ).strftime(
             DEFAULT_SERVER_DATETIME_FORMAT
         )
