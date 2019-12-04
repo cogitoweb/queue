@@ -308,18 +308,24 @@ class Database(object):
 
                 CREATE OR REPLACE
                     FUNCTION queue_job_notify() RETURNS trigger AS $$
+
+                    DECLARE base_url text;
                 BEGIN
+                    base_url := (select value from ir_config_parameter where key = 'web.base.url');
+
                     IF TG_OP = 'DELETE' THEN
                         IF OLD.state != 'done' THEN
-                            SELECT notify_job(
-                                current_database(),
+                            PERFORM notify_job(
+                                base_url,
+                                current_database()::text,
                                 OLD.uuid
                             );
                         END IF;
                     ELSE
-                        SELECT notify_job(
-                            current_database(),
-                            OLD.uuid
+                        PERFORM notify_job(
+                            base_url,
+                            current_database()::text,
+                            NEW.uuid
                         );
                     END IF;
                     RETURN NULL;
@@ -370,6 +376,7 @@ class QueueJobRunner(object):
         self.channel_manager.simple_configure(channel_config_string)
         self.db_by_name = {}
         self._stop = False
+        self._stop_pipe = os.pipe()
 
     def get_db_names(self):
         if odoo.tools.config['db_name']:
@@ -416,12 +423,77 @@ class QueueJobRunner(object):
                             job.db_name,
                             job.uuid)
 
+    def process_notifications(self):
+        for db in self.db_by_name.values():
+            while db.conn.notifies:
+                if self._stop:
+                    break
+                notification = db.conn.notifies.pop()
+                uuid = notification.payload
+                job_datas = db.select_jobs('uuid = %s', (uuid,))
+                if job_datas:
+                    self.channel_manager.notify(db.db_name, *job_datas[0])
+                else:
+                    self.channel_manager.remove_job(uuid)
+
+    def wait_notification(self):
+        for db in self.db_by_name.values():
+            if db.conn.notifies:
+                # something is going on in the queue, no need to wait
+                return
+        # wait for something to happen in the queue_job tables
+        # we'll select() on database connections and the stop pipe
+        conns = [db.conn for db in self.db_by_name.values()]
+        conns.append(self._stop_pipe[0])
+        # look if the channels specify a wakeup time
+        wakeup_time = self.channel_manager.get_wakeup_time()
+        if not wakeup_time:
+            # this could very well be no timeout at all, because
+            # any activity in the job queue will wake us up, but
+            # let's have a timeout anyway, just to be safe
+            timeout = SELECT_TIMEOUT
+        else:
+            timeout = wakeup_time - _odoo_now()
+        # wait for a notification or a timeout;
+        # if timeout is negative (ie wakeup time in the past),
+        # do not wait; this should rarely happen
+        # because of how get_wakeup_time is designed; actually
+        # if timeout remains a large negative number, it is most
+        # probably a bug
+        _logger.debug("select() timeout: %.2f sec", timeout)
+        if timeout > 0:
+            conns, _, _ = select.select(conns, [], [], timeout)
+            if conns and not self._stop:
+                for conn in conns:
+                    conn.poll()
+
     def stop(self):
         _logger.info("graceful stop requested")
-        self.close_databases(remove_jobs=False)
         self._stop = True
+        # wakeup the select() in wait_notification
+        os.write(self._stop_pipe[1], '.')
 
     def run(self):
         _logger.info("starting")
-        self.initialize_databases()
-        _logger.info("database connections ready")
+        while not self._stop:
+            # outer loop does exception recovery
+            try:
+                _logger.info("initializing database connections")
+                # TODO: how to detect new databases or databases
+                #       on which queue_job is installed after server start?
+                self.initialize_databases()
+                _logger.info("database connections ready")
+                # inner loop does the normal processing
+                while not self._stop:
+                    self.process_notifications()
+                    self.run_jobs()
+                    self.wait_notification()
+            except KeyboardInterrupt:
+                self.stop()
+            except:
+                _logger.exception("exception: sleeping %ds and retrying",
+                                  ERROR_RECOVERY_DELAY)
+                self.close_databases()
+                time.sleep(ERROR_RECOVERY_DELAY)
+        self.close_databases(remove_jobs=False)
+        _logger.info("stopped")

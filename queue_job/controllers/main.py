@@ -14,6 +14,7 @@ from odoo import _, http, tools
 from odoo.service.model import PG_CONCURRENCY_ERRORS_TO_RETRY
 
 from ..job import Job, ENQUEUED
+from ..jobrunner.runner import QueueJobRunner
 from ..exception import (NoSuchJobError,
                          NotReadableJobError,
                          RetryableJobError,
@@ -80,16 +81,23 @@ class RunJobController(http.Controller):
     @http.route('/queue_job/notifyjob', type='http', auth="none")
     def notifyjob(self, db, job_uuid):
 
-        global runner_thread
-        runner = runner_thread.runner
+        runner = QueueJobRunner()
+
+        _logger.info("BBBBBBBBBBBBBB")
+        _logger.info(
+            runner.db_by_name
+        )
 
         for key, value in runner.db_by_name.items():
 
             if key == db:
                 job_datas = value.select_jobs('uuid = %s', (job_uuid,))
 
+                _logger.info("AAAAAAAAAAAAAAAAAAAAAAAAAA")
+                _logger.info(job_datas)
+
                 if job_datas:
-                    runner.channel_manager.notify(key, job_uuid)
+                    runner.channel_manager.notify(key, *job_datas[0])
                 else:
                     runner.channel_manager.remove_job(job_uuid)
 
