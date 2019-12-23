@@ -5,11 +5,11 @@
 import logging
 from datetime import datetime, timedelta
 
-from odoo import models, fields, api, exceptions, _
+from odoo import models, fields, api, exceptions, _, SUPERUSER_ID
 from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT, \
     DEFAULT_SERVER_DATE_FORMAT
 
-from ..job import STATES, DONE, PENDING, ENQUEUED, Job
+from ..job import STATES, DONE, PENDING, ENQUEUED, STARTED, Job
 from ..fields import JobSerialized
 
 _logger = logging.getLogger(__name__)
@@ -280,7 +280,7 @@ class QueueJob(models.Model):
             and date_done <
             (now() at time zone 'utc') -
             (interval '%s days') """ % self._removal_interval
-        
+
         _logger.info("cleaning jobs with following query %s" % clean_query)
 
         self.env.cr.execute(clean_query)
@@ -333,15 +333,52 @@ class QueueJob(models.Model):
             DEFAULT_SERVER_DATETIME_FORMAT
         )
 
+        # enqueued job
         jobs_started = self.env['queue.job'].search([
             ('state', '=', ENQUEUED),
             ('date_enqueued', '<', five_minutes_ago),
         ])
 
-        for job in jobs_started:
+        # blocked started job
+        jobs_started_blocked = self.env['queue.job'].search([
+            ('state', '=', STARTED),
+            ('date_started', '<', five_minutes_ago),
+        ])
+
+        all_jobs = jobs_started + jobs_started_blocked
+
+        _logger.info('JOB started: %s' % jobs_started)
+        _logger.info('JOB started blocked: %s' % jobs_started_blocked)
+
+        email_to = self.env['res.users'].sudo().browse(SUPERUSER_ID).partner_id.email
+
+        for job in all_jobs:
+            _logger.info('JOB: %s' % job)
             counter += 1
 
             if job.retry < job.max_retries:
+                # send warning message
+                if job.job_function_id.channel_id.notify and job.state == 'started':
+                    body_html = '<h3>' + job.name + '</h3>' +\
+                                '<p>Something went wrong</p>' +\
+                                '<p>Job has automatically requeue, ' +\
+                                'please check job id: <b>' +\
+                                job.id + '</b> of channel: <b>' +\
+                                job.channel + '</b><br/>' +\
+                                'started date: ' + job.date_started +'</p>'
+
+                    template_obj = self.env['mail.mail']
+                    template_data = {
+                        'subject': 'Notify job ' + job.id,
+                        'email_from': job.company_id.email if job.company_id else '',
+                        'email_to': email_to,
+                        'body_html': body_html
+                    }
+                    template_id = template_obj.create(template_data)
+                    template_obj.send(template_id)
+
+                    _logger.info('send mail for job id %s' % job.id)
+
                 # we don't use requeue() to prevent reset retry counter
                 job._change_job_state(PENDING, False)
                 _logger.info("force requeue job id %s" % job.id)
