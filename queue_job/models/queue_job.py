@@ -338,7 +338,6 @@ class QueueJob(models.Model):
             ('date_enqueued', '<', five_minutes_ago),
         ])
 
-
         for job in jobs_started:
             counter += 1
 
@@ -411,6 +410,11 @@ class JobChannel(models.Model):
     job_function_ids = fields.One2many(comodel_name='queue.job.function',
                                        inverse_name='channel_id',
                                        string='Job Functions')
+
+    notify = fields.Boolean(
+        string='Notify Job',
+        default=False
+    )
 
     _sql_constraints = [
         ('name_uniq',
