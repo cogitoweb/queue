@@ -347,10 +347,8 @@ class QueueJob(models.Model):
 
         all_jobs = jobs_started + jobs_started_blocked
 
-        _logger.info('JOB started: %s' % jobs_started)
-        _logger.info('JOB started blocked: %s' % jobs_started_blocked)
-
-        email_to = self.env['res.users'].sudo().browse(SUPERUSER_ID).partner_id.email
+        mail_to = self.env['res.users'].sudo().browse(SUPERUSER_ID).partner_id.email
+        Mail = self.env['mail.mail']
 
         for job in all_jobs:
             _logger.info('JOB: %s' % job)
@@ -359,23 +357,27 @@ class QueueJob(models.Model):
             if job.retry < job.max_retries:
                 # send warning message
                 if job.job_function_id.channel_id.notify and job.state == 'started':
+                    # prepare mail body
                     body_html = '<h3>' + job.name + '</h3>' +\
                                 '<p>Something went wrong</p>' +\
-                                '<p>Job has automatically requeue, ' +\
-                                'please check job id: <b>' +\
-                                job.id + '</b> of channel: <b>' +\
-                                job.channel + '</b><br/>' +\
-                                'started date: ' + job.date_started +'</p>'
+                                '<p>System has automatically requeue the job' +\
+                                '<br/>please check job id: <b>' + str(job.id) +\
+                                '</b> of channel: <b>' + job.channel + '</b>' +\
+                                '<br/>task: <b>' + job.func_string + '</b>' +\
+                                '<br/>started date: <b>' +\
+                                str(job.date_started) + '</b></p>'
 
-                    template_obj = self.env['mail.mail']
+                    # prepare mail data
                     template_data = {
-                        'subject': 'Notify job ' + job.id,
+                        'subject': 'Notify job ' + str(job.id),
                         'email_from': job.company_id.email if job.company_id else '',
                         'email_to': email_to,
                         'body_html': body_html
                     }
-                    template_id = template_obj.create(template_data)
-                    template_obj.send(template_id)
+                    template_id = Mail.create(template_data)
+
+                    # send mail data
+                    Mail.send(template_id)
 
                     _logger.info('send mail for job id %s' % job.id)
 
