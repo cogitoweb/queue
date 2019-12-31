@@ -347,7 +347,7 @@ class QueueJob(models.Model):
 
         all_jobs = jobs_started + jobs_started_blocked
 
-        mail_to = self.env['res.users'].sudo().browse(SUPERUSER_ID).partner_id.email
+        email_to = self.env['res.users'].sudo().browse(SUPERUSER_ID).partner_id.email
         Mail = self.env['mail.mail']
 
         for job in all_jobs:
