@@ -343,6 +343,7 @@ class QueueJob(models.Model):
         jobs_started_blocked = self.env['queue.job'].search([
             ('state', '=', STARTED),
             ('date_started', '<', five_minutes_ago),
+            ('channel', 'not in', ['root.delayed_document', 'root.recalc.longrunning'])
         ])
 
         all_jobs = jobs_started + jobs_started_blocked
