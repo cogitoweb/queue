@@ -9,7 +9,7 @@ import psutil
 import odoo
 import odoo.tools.config as config
 
-from odoo import models, fields, api, _
+from odoo import models, fields, api, _, http
 from odoo.service.server import WorkerHTTP as OdooWorker
 
 _logger = logging.getLogger(__name__)
@@ -20,8 +20,13 @@ def process_limit_job(self):
 
     _logger.info('--------- MONKEY PATCH ---------')
     _logger.info('----------------------------------')
-    _logger.info(pprint.pformat(self.server.socket))
-
+    if http:
+        _logger.info('A')
+        if http.request:
+            _logger.info('B')
+            if http.request.httprequest:
+                _logger.info('C')
+                _logger.info(http.request.httprequest)
 
     # If our parent changed sucide
     if self.ppid != os.getppid():
