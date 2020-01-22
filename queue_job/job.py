@@ -460,19 +460,48 @@ class Job(object):
         self.eta = eta
         self.channel = channel
 
+    def get_pid_file_path(self):
+        # get pid file full path for this job
+        if self.channel in ['root.delayed_document', 'root.recalc.longrunning']:
+            subfolder = 'coral-longrunning'
+        else:
+            subfolder = 'coral-jobs'
+
+        # for some reason, no PID at this moment
+        if not self.system_pid:
+            return False
+
+        # path to save pid files doesnt exist
+        job_pid_folder = "/tmp/{subfolder}".format(subfolder=subfolder)
+        if not os.path.exists(job_pid_folder):
+            os.mkdir(job_pid_folder)
+
+        # where job pid file should be found
+        job_pid_file = "{job_pid_folder}/{pid_number}.pid".format(
+            job_pid_folder=job_pid_folder,
+            pid_number=self.system_pid
+        )
+
+        return job_pid_file
+
+
     def save_pid(self):
         # get the assigned pid and create a file to remember it
         self.system_pid = os.getpid()
 
-        if self.system_pid:
-            job_pid_file = "/tmp/{pid_number}.pid".format(
-                pid_number=self.system_pid
-            )
+        job_pid_file = self.get_pid_file_path()
+        with open(job_pid_file, 'a'):
+            os.utime(job_pid_file, None)
 
-            with open(job_pid_file, 'a'):
-                os.utime(job_pid_file, None)
+    def clear_pid(self):
+        # delete job pid file
+        job_pid_file = self.get_pid_file_path()
+        if job_pid_file and os.path.exists(job_pid_file):
+            os.remove(job_pid_file)
+        elif job_pid_file:
+            _logger.info("file not found")
         else:
-            _logger.info("No pid file created!")
+            _logger.info("no pid")
 
     def perform(self):
         """ Execute the job.
@@ -628,6 +657,7 @@ class Job(object):
         self.date_done = datetime.now()
         if self.system_pid:
             _logger.info("removing file with pid %s" % self.system_pid)
+            self.clear_pid()
         if result is not None:
             self.result = result
 
@@ -635,6 +665,7 @@ class Job(object):
         self.state = FAILED
         if self.system_pid:
             _logger.info("removing file with pid %s" % self.system_pid)
+            self.clear_pid()
         if exc_info is not None:
             self.exc_info = exc_info
 
