@@ -8,6 +8,7 @@ import hashlib
 import logging
 import uuid
 import sys
+import os
 from datetime import datetime, timedelta
 
 import odoo
@@ -355,7 +356,8 @@ class Job(object):
     def __init__(self, func,
                  args=None, kwargs=None, priority=None,
                  eta=None, job_uuid=None, max_retries=None,
-                 description=None, channel=None, identity_key=None):
+                 description=None, channel=None, identity_key=None,
+                 system_pid=None):
         """ Create a Job
 
         :param func: function to execute
@@ -415,6 +417,7 @@ class Job(object):
             self.max_retries = max_retries
 
         self._uuid = job_uuid
+        self.system_pid = system_pid
 
         self.args = args
         self.kwargs = kwargs
@@ -457,12 +460,28 @@ class Job(object):
         self.eta = eta
         self.channel = channel
 
+    def save_pid(self):
+        # get the assigned pid and create a file to remember it
+        self.system_pid = os.getpid()
+
+        if self.system_pid:
+            job_pid_file = "/tmp/{pid_number}.pid".format(
+                pid_number=self.system_pid
+            )
+
+            with open(job_pid_file, 'a'):
+                os.utime(job_pid_file, None)
+        else:
+            _logger.info("No pid file created!")
+
     def perform(self):
         """ Execute the job.
 
         The job is executed with the user which has initiated it.
         """
         self.retry += 1
+        self.save_pid()  # [cgt-edit]
+
         try:
             self.result = self.func(*tuple(self.args), **self.kwargs)
         except RetryableJobError as err:
@@ -510,6 +529,10 @@ class Job(object):
             vals['eta'] = dt_to_string(self.eta)
         if self.identity_key:
             vals['identity_key'] = self.identity_key
+
+        # [cgt-edit] get and save PID from OS
+        if self.system_pid:
+            vals['system_pid'] = self.system_pid
 
         db_record = self.db_record()
         if db_record:
