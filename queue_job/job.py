@@ -480,7 +480,6 @@ class Job(object):
         The job is executed with the user which has initiated it.
         """
         self.retry += 1
-        self.save_pid()  # [cgt-edit]
 
         try:
             self.result = self.func(*tuple(self.args), **self.kwargs)
@@ -621,16 +620,21 @@ class Job(object):
     def set_started(self):
         self.state = STARTED
         self.date_started = datetime.now()
+        self.save_pid()
 
     def set_done(self, result=None):
         self.state = DONE
         self.exc_info = None
         self.date_done = datetime.now()
+        if self.system_pid:
+            _logger.info("removing file with pid %s" % self.system_pid)
         if result is not None:
             self.result = result
 
     def set_failed(self, exc_info=None):
         self.state = FAILED
+        if self.system_pid:
+            _logger.info("removing file with pid %s" % self.system_pid)
         if exc_info is not None:
             self.exc_info = exc_info
 
