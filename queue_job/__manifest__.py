@@ -1,24 +1,44 @@
 # -*- coding: utf-8 -*-
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+{
+    'name': 'Job Queue',
+    'version': '10.0.1.1.0',
 
-{'name': 'Job Queue',
- 'version': '10.0.1.0.0',
- 'author': 'Camptocamp,ACSONE SA/NV,Odoo Community Association (OCA)',
- 'website': 'https://github.com/OCA/queue',
- 'license': 'AGPL-3',
- 'category': 'Generic Modules',
- 'depends': ['mail'
-             ],
- 'external_dependencies': {'python': ['requests'
-                                      ],
-                           },
- 'data': ['security/security.xml',
-          'security/ir.model.access.csv',
-          'views/queue_job_views.xml',
-          'data/queue_data.xml',
-          ],
- 'installable': True,
- 'development_status': 'Mature',
- 'maintainers': ['guewen'],
- }
+    'author': 'Camptocamp,ACSONE SA/NV,Odoo Community Association (OCA)',
+    'website': 'https://github.com/OCA/queue',
+
+    'license': 'AGPL-3',
+    'category': 'Generic Modules',
+
+    # any module necessary for this one to work correctly
+    'depends': [
+        'mail'
+    ],
+
+    'external_dependencies': {
+        'python': [
+            'requests'
+        ],
+    },
+
+    # always loaded
+    'data': [
+        # security
+        'security/security.xml',
+        'security/ir.model.access.csv',
+
+        # views
+        'views/queue_job_views.xml',
+
+        # data
+        'data/queue_data.xml',
+    ],
+
+    'installable': True,
+
+    'development_status': 'Mature',
+    'maintainers': [
+        'guewen'
+    ]
+}
