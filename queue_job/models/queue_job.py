@@ -63,6 +63,7 @@ class QueueJob(models.Model):
     date_started = fields.Datetime(string='Start Date', readonly=True)
     date_enqueued = fields.Datetime(string='Enqueue Time', readonly=True)
     date_done = fields.Datetime(string='Date Done', readonly=True)
+    system_pid = fields.Integer(string='Process ID')  # [cgt-edit]
 
     eta = fields.Datetime(string='Execute only after')
     retry = fields.Integer(string='Current try')
