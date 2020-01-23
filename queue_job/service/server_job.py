@@ -92,11 +92,9 @@ def monkey_process_timeout(self):
 
         # choose which timeout to respect
         if get_longrunning_uuid_from_pid(pid):
-            _logger.info("--- using longrunning timeout")
-            worker_timeout = worker.watchdog_timeout
+            worker_timeout = worker.watchdog_longrunning_timeout
             worker_class = 'Longrunning' + worker.__class__.__name__
         else:
-            _logger.info("--- using hard limit timeout")
             worker_timeout = worker.watchdog_timeout
             worker_class = worker.__class__.__name__
 
@@ -110,5 +108,52 @@ def monkey_process_timeout(self):
             self.worker_kill(pid, signal.SIGKILL)
 
 
+def monkey_preforkserver_init(self, app):
+    self.address = config['xmlrpc'] and (config['xmlrpc_interface'] or '0.0.0.0', config['xmlrpc_port'])
+    self.population = config['workers']
+    self.timeout = config['limit_time_real']
+    self.limit_request = config['limit_request']
+    self.cron_timeout = config['limit_time_real_cron'] or None
+    if self.cron_timeout == -1:
+        self.cron_timeout = self.timeout
+
+    # working vars
+    self.beat = 4
+    self.app = app
+    self.pid = os.getpid()
+    self.socket = None
+    self.workers_http = {}
+    self.workers_cron = {}
+    self.workers = {}
+    self.generation = 0
+    self.queue = []
+    self.long_polling_pid = None
+
+    # [cgt-edit] add a different timeout from longrunning jobs
+    self.timeout_longrunning = config['limit_time_longrunning'] or config['limit_time_real']
+
+
+def monkey_worker_init(self, multi):
+    self.multi = multi
+    self.watchdog_time = time.time()
+    self.watchdog_pipe = multi.pipe_new()
+
+    # Can be set to None if no watchdog is desired.
+    self.watchdog_timeout = multi.timeout
+    self.ppid = os.getpid()
+    self.pid = None
+    self.alive = True
+
+    # should we rename into lifetime ?
+    self.request_max = multi.limit_request
+    self.request_count = 0
+
+    # [cgt-edit] add a different timeout from longrunning jobs
+    self.watchdog_longrunning_timeout = multi.timeout_longrunning
+
+
+# apply monkey patch
 OdooWorkerHTTP.process_limit = monkey_process_limit
 OdooPreforkServer.process_timeout = monkey_process_timeout
+OdooPreforkServer.__init__ = monkey_preforkserver_init
+OdooWorker.__init__ = monkey_worker_init
