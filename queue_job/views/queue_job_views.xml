@@ -20,6 +20,12 @@
                         string="Set to 'Done'"
                         type="object"
                         groups="queue_job.group_queue_job_manager"/>
+                    <button name="action_kill_me"
+                        states="started"
+                        class="oe_highlight"
+                        string="Kill me"
+                        type="object"
+                        groups="queue_job.group_queue_job_manager"/>
                     <button name="open_related_action"
                         string="Related"
                         type="object"

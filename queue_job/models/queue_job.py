@@ -5,6 +5,9 @@
 import logging
 from datetime import datetime, timedelta
 
+import os
+import signal
+
 from odoo import models, fields, api, exceptions, _, SUPERUSER_ID
 from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT, \
     DEFAULT_SERVER_DATE_FORMAT
@@ -162,6 +165,33 @@ class QueueJob(models.Model):
             else:
                 raise ValueError('State not supported: %s' % state)
             job_.store()
+
+    @api.multi
+    def action_kill_me(self):
+        for record in self:
+
+            # not a running job
+            if record.state not in [STARTED]:
+                raise exceptions.ValidationError(
+                    "Why are you killing a process that is not even in started?"
+                )
+
+            # no PID or init
+            if not record.system_pid or record.system_pid < 2:
+                raise exceptions.ValidationError(
+                    "Invalid PID."
+                )
+
+            try:
+                os.kill(record.system_pid, signal.SIGTERM)
+                # record.set_failed()
+            except Exception:
+                raise exceptions.ValidationError(
+                    "Something went wrong while killing PID %s."
+                    % (record.system_pid)
+                )
+
+        return True
 
     @api.multi
     def action_done(self, reason=None):
