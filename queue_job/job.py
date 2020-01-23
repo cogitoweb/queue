@@ -461,7 +461,11 @@ class Job(object):
         self.channel = channel
 
     def get_pid_file_path(self):
-        # get pid file full path for this job
+        # get the full path string to the pid file
+        # for this job
+
+        # separate folder for longrunning channels
+        # [TODO] find a better way to do this
         if self.channel in ['root.delayed_document', 'root.recalc.longrunning']:
             subfolder = 'coral-longrunning'
         else:
@@ -486,7 +490,9 @@ class Job(object):
 
 
     def save_pid(self):
-        # get the assigned pid and create a file to remember it
+        # get the assigned pid and create a file
+        # to remember who is working on this job
+
         self.system_pid = os.getpid()
 
         job_pid_file = self.get_pid_file_path()
@@ -494,14 +500,15 @@ class Job(object):
             os.utime(job_pid_file, None)
 
     def clear_pid(self):
-        # delete job pid file
+        # delete the pid file of this job
+
         job_pid_file = self.get_pid_file_path()
         if job_pid_file and os.path.exists(job_pid_file):
             os.remove(job_pid_file)
         elif job_pid_file:
-            _logger.info("file not found")
+            _logger.info("PID file for process %s not found" % (self.system_pid))
         else:
-            _logger.info("no pid")
+            _logger.info("cant delete PID file, no info about process")
 
     def perform(self):
         """ Execute the job.
@@ -649,7 +656,7 @@ class Job(object):
     def set_started(self):
         self.state = STARTED
         self.date_started = datetime.now()
-        self.save_pid()
+        self.save_pid()  # save PID that is working on this job
 
     def set_done(self, result=None):
         self.state = DONE
