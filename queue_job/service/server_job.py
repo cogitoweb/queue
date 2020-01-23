@@ -4,6 +4,7 @@ from odoo import api, http
 from odoo.service.server import Worker as OdooWorker
 from odoo.service.server import WorkerHTTP as OdooWorkerHTTP
 from odoo.service.server import memory_info
+from odoo.addons.queue_job.job import JOB_PID_FOLDER_LONGRUNNING
 
 import odoo.tools.config as config
 
@@ -55,6 +56,14 @@ def monkey_process_limit(self):
     cpu_time = r.ru_utime + r.ru_stime
 
     def time_expired(n, stack):
+        # expected_longrunning_pid_file = "{job_pid_folder}/{pid_number}.pid".format(
+        #     job_pid_folder=JOB_PID_FOLDER_LONGRUNNING,
+        #     pid_number=self.pid
+        # )
+
+        # if os.path.exists(expected_longrunning_pid_file):
+        #     _logger.info('Worker (%d) CPU time limit (%s) reached BUT its a longrunning job.', self.pid, config['limit_time_cpu'])
+        # else:
         _logger.info('Worker (%d) CPU time limit (%s) reached.', self.pid, config['limit_time_cpu'])
         # We dont suicide in such case
         raise Exception('CPU time limit exceeded.')
@@ -62,6 +71,7 @@ def monkey_process_limit(self):
     signal.signal(signal.SIGXCPU, time_expired)
     soft, hard = resource.getrlimit(resource.RLIMIT_CPU)
     resource.setrlimit(resource.RLIMIT_CPU, (cpu_time + config['limit_time_cpu'], hard))
+    _logger.debug(" ------- PID %s SOFT %s HARD %s CPU_TIME %s COMBO %s" % (self.pid, soft, hard, cpu_time, cpu_time + config['limit_time_cpu']))
 
 
 OdooWorkerHTTP.process_limit = monkey_process_limit
