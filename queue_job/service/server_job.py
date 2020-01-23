@@ -93,7 +93,7 @@ def monkey_process_timeout(self):
         # choose which timeout to respect
         if get_longrunning_uuid_from_pid(pid):
             worker_timeout = worker.watchdog_longrunning_timeout
-            worker_class = 'Longrunning' + worker.__class__.__name__
+            worker_class = 'Longrunning ' + worker.__class__.__name__
         else:
             worker_timeout = worker.watchdog_timeout
             worker_class = worker.__class__.__name__
@@ -130,7 +130,7 @@ def monkey_preforkserver_init(self, app):
     self.long_polling_pid = None
 
     # [cgt-edit] add a different timeout from longrunning jobs
-    self.timeout_longrunning = config['limit_time_longrunning'] or config['limit_time_real']
+    self.timeout_longrunning = int(config['limit_time_longrunning']) if config['limit_time_longrunning'] else config['limit_time_real']
 
 
 def monkey_worker_init(self, multi):
