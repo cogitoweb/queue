@@ -33,6 +33,10 @@ DEFAULT_PRIORITY = 10  # used by the PriorityQueue to sort the jobs
 DEFAULT_MAX_RETRIES = 5
 RETRY_INTERVAL = 10 * 60  # seconds
 
+JOB_PID_FOLDER_ROOT = '/tmp'
+JOB_PID_FOLDER_NORMAL = JOB_PID_FOLDER_ROOT + '/coral-longrunning'
+JOB_PID_FOLDER_LONGRUNNING = JOB_PID_FOLDER_ROOT + '/coral-longrunning'
+
 _logger = logging.getLogger(__name__)
 
 
@@ -467,16 +471,15 @@ class Job(object):
         # separate folder for longrunning channels
         # [TODO] find a better way to do this
         if self.channel in ['root.delayed_document', 'root.recalc.longrunning']:
-            subfolder = 'coral-longrunning'
+            job_pid_folder = JOB_PID_FOLDER_LONGRUNNING
         else:
-            subfolder = 'coral-jobs'
+            job_pid_folder = JOB_PID_FOLDER_NORMAL
 
         # for some reason, no PID at this moment
         if not self.system_pid:
             return False
 
         # path to save pid files doesnt exist
-        job_pid_folder = "/tmp/{subfolder}".format(subfolder=subfolder)
         if not os.path.exists(job_pid_folder):
             os.mkdir(job_pid_folder)
 
