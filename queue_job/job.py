@@ -499,8 +499,9 @@ class Job(object):
         self.system_pid = os.getpid()
 
         job_pid_file = self.get_pid_file_path()
-        with open(job_pid_file, 'a'):
+        with open(job_pid_file, 'a') as f:
             os.utime(job_pid_file, None)
+            f.write(self.uuid)
 
     def clear_pid(self):
         # delete the pid file of this job
