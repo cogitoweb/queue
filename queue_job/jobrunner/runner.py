@@ -250,7 +250,7 @@ def _async_http_get(scheme, host, port, user, password, db_name, job_uuid):
             # for codes between 500 and 600
             response.raise_for_status()
         except requests.Timeout:
-            set_job_pending()
+            _logger.debug("ignore timeout exception GET %s", url)
         except Exception:
             _logger.exception("exception in GET %s", url)
             session.cookies.clear()
