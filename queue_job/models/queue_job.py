@@ -360,6 +360,7 @@ class QueueJob(models.Model):
             #DO NOT REQUEUE A JOB IF ITS PID IS STILL RUNNING
             if job.state == STARTED and job.worker_pid != False and job.check_pid():
                 _logger.info('SKIPPING requeue job %s, its corresponding process %s is still running' % (job.uuid, job.worker_pid))
+                continue
 
             if job.retry < job.max_retries:
                 # send warning message
