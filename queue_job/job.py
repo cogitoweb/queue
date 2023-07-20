@@ -295,6 +295,7 @@ class Job(object):
         job_.model_name = stored.model_name if stored.model_name else None
         job_.retry = stored.retry
         job_.max_retries = stored.max_retries
+        job_.worker_pid = stored.worker_pid
         if stored.company_id:
             job_.company_id = stored.company_id.id
         return job_
@@ -456,6 +457,7 @@ class Job(object):
         self._eta = None
         self.eta = eta
         self.channel = channel
+        self.worker_pid = None
 
     def perform(self):
         """ Execute the job.
@@ -498,6 +500,7 @@ class Job(object):
                 'date_done': False,
                 'eta': False,
                 'identity_key': False,
+                'worker_pid': False
                 }
         dt_to_string = odoo.fields.Datetime.to_string
         if self.date_enqueued:
@@ -510,6 +513,8 @@ class Job(object):
             vals['eta'] = dt_to_string(self.eta)
         if self.identity_key:
             vals['identity_key'] = self.identity_key
+        if self.worker_pid:
+            vals['worker_pid'] = self.worker_pid
 
         db_record = self.db_record()
         if db_record:
@@ -585,6 +590,7 @@ class Job(object):
         self.state = PENDING
         self.date_enqueued = None
         self.date_started = None
+        self.worker_pid = None
         if reset_retry:
             self.retry = 0
         if result is not None:
@@ -594,10 +600,12 @@ class Job(object):
         self.state = ENQUEUED
         self.date_enqueued = datetime.now()
         self.date_started = None
+        self.worker_pid = None
 
     def set_started(self):
         self.state = STARTED
         self.date_started = datetime.now()
+        self.worker_pid = os.getpid()
 
     def set_done(self, result=None):
         self.state = DONE
