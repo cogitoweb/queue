@@ -7,6 +7,7 @@ import functools
 import hashlib
 import logging
 import uuid
+import os
 import sys
 from datetime import datetime, timedelta
 
