@@ -2,6 +2,7 @@
 # Copyright 2013-2016 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import os
 import logging
 from datetime import datetime, timedelta
 
@@ -87,6 +88,7 @@ class QueueJob(models.Model):
                           index=True)
 
     identity_key = fields.Char()
+    worker_pid = fields.Integer(readonly=True)
 
     @api.model_cr
     def init(self):
@@ -355,6 +357,10 @@ class QueueJob(models.Model):
             _logger.info('JOB: %s' % job)
             counter += 1
 
+            #DO NOT REQUEUE A JOB IF ITS PID IS STILL RUNNING
+            if job.state == STARTED and job.worker_pid != False and check_pid(job.worker_pid):
+                _logger.info('SKIPPING requeue job %s, its corresponding process %s is still running' % (job.uuid, job.worker_pid))
+
             if job.retry < job.max_retries:
                 # send warning message
                 if job.job_function_id.channel_id.notify and job.state == 'started':
@@ -384,6 +390,8 @@ class QueueJob(models.Model):
 
                 # we don't use requeue() to prevent reset retry counter
                 job._change_job_state(PENDING, False)
+                #unset pid
+                job.worker_pid = False
                 _logger.info("force requeue job id %s" % job.id)
 
             else:
@@ -395,6 +403,15 @@ class QueueJob(models.Model):
                     _logger.info("force to fail job id %s" % job.id)
 
         return counter
+
+    def check_pid(self):        
+        """ Check For the existence of a unix pid. """
+        try:
+            os.kill(self.worker_pid, 0)
+        except OSError:
+            return False
+        else:
+            return True
 
 
 class RequeueJob(models.TransientModel):
