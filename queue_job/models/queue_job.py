@@ -2,6 +2,7 @@
 # Copyright 2013-2016 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import os
 import logging
 from datetime import datetime, timedelta
 
@@ -87,6 +88,7 @@ class QueueJob(models.Model):
                           index=True)
 
     identity_key = fields.Char()
+    worker_pid = fields.Integer(readonly=True)
 
     @api.model_cr
     def init(self):
@@ -215,6 +217,25 @@ class QueueJob(models.Model):
         )
         tracking_disable = False if config_model and config_model.value == 'True' else True
 
+        #handle corner case that can happen because Odoo DB connection management sucks
+        #a job that crashed due to DB connection issues will stay in 'started' mode indefinitely 
+        #and block the queue channel
+        #if a job in 'started' state with the same worker_pid exists, it's certainly blocked due to the reason above, force requeue it
+        #no need to check for different pid as the current job is not yet in started state ('write' operation happens below)
+        if vals.get('state') == 'started' and vals.get('worker_pid'):
+            blocked_domain = [
+            ('state', '=', STARTED),
+            ('worker_pid', '=', vals.get('worker_pid')),
+            ]
+            
+            blocked_jobs = self.search(blocked_domain)
+            for job in blocked_jobs:
+                # we don't use requeue() to prevent reset retry counter
+                job._change_job_state(PENDING, False)
+                #unset pid
+                job.worker_pid = False
+                _logger.info("force requeue blocked job id %s, uuid %s, because a new job started with the same worker_pid %s" % (job.id, job.uuid, vals.get('worker_pid')))
+        
         self = self.with_context(tracking_disable=tracking_disable)
         res = super(QueueJob, self).write(vals)
 
@@ -355,6 +376,11 @@ class QueueJob(models.Model):
             _logger.info('JOB: %s' % job)
             counter += 1
 
+            #DO NOT REQUEUE A JOB IF ITS PID IS STILL RUNNING
+            if job.state == STARTED and job.worker_pid != False and job.check_pid():
+                _logger.info('SKIPPING requeue job %s, its corresponding process %s is still running' % (job.uuid, job.worker_pid))
+                continue
+
             if job.retry < job.max_retries:
                 # send warning message
                 if job.job_function_id.channel_id.notify and job.state == 'started':
@@ -384,6 +410,8 @@ class QueueJob(models.Model):
 
                 # we don't use requeue() to prevent reset retry counter
                 job._change_job_state(PENDING, False)
+                #unset pid
+                job.worker_pid = False
                 _logger.info("force requeue job id %s" % job.id)
 
             else:
@@ -394,7 +422,35 @@ class QueueJob(models.Model):
                     job.write({'state': 'failed'})
                     _logger.info("force to fail job id %s" % job.id)
 
+        #always requeue jobs that are stuck in 'started' state for more than one hour, regardless of pid status and channel
+        one_hour_ago = (
+            datetime.now() - timedelta(minutes=60)
+        ).strftime(
+            DEFAULT_SERVER_DATETIME_FORMAT
+        )
+        jobs_started_blocked_hour = self.env['queue.job'].search([
+            ('state', '=', STARTED),
+            ('date_started', '<', one_hour_ago)
+        ])
+        
+        for job in jobs_started_blocked_hour:
+            _logger.info('JOB STUCK IN STARTED FOR MORE THAN ONE HOUR: %s' % job)
+            # we don't use requeue() to prevent reset retry counter
+            job._change_job_state(PENDING, False)
+            #unset pid
+            job.worker_pid = False
+            _logger.info("force requeue job id %s, because it was stuck in 'started' state for more than one hour" % job.id)
+            
         return counter
+
+    def check_pid(self):        
+        """ Check For the existence of a unix pid. """
+        try:
+            os.kill(self.worker_pid, 0)
+        except OSError:
+            return False
+        else:
+            return True
 
 
 class RequeueJob(models.TransientModel):
