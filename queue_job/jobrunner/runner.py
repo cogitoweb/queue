@@ -265,7 +265,7 @@ class Database(object):
 
     def __init__(self, db_name):
         self.db_name = db_name
-        connection_info = odoo.sql_db.connection_info_for(db_name)[1]
+        connection_info = _connection_info_for(db_name)
         self.conn = psycopg2.connect(**connection_info)
         self.conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         self.has_queue_job = self._has_queue_job()
