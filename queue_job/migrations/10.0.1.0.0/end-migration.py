@@ -24,6 +24,6 @@ def migrate(cr, version):
         method = getattr(model, group['method_name'], False)
         QueueJob.search(group['__domain']).write({
             'channel_method_name': '<%s>.%s' % (
-                method.im_class._name, method.__name__,
+                method.__self__.__class__._name, method.__name__,
             ),
         })

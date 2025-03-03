@@ -61,7 +61,7 @@ class TestRelatedAction(common.SavepointCase):
         """
         job_ = self.model.with_delay().testing_related_action__no()
         expected = None
-        self.assertEquals(job_.related_action(), expected)
+        self.assertEqual(job_.related_action(), expected)
 
     def test_model_default_no_record(self):
         """Model shows an error when using the default action and we have no
@@ -93,7 +93,7 @@ class TestRelatedAction(common.SavepointCase):
             'view_mode': 'form',
             'view_type': 'form',
         }
-        self.assertEquals(job_.related_action(), expected)
+        self.assertEqual(job_.related_action(), expected)
 
     def test_default_several_record(self):
         """Default related action called when no decorator is set
@@ -116,7 +116,7 @@ class TestRelatedAction(common.SavepointCase):
             'view_mode': 'tree,form',
             'view_type': 'form',
         }
-        self.assertEquals(job_.related_action(), expected)
+        self.assertEqual(job_.related_action(), expected)
 
     def test_decorator(self):
         """Call the related action on the model
@@ -137,4 +137,4 @@ class TestRelatedAction(common.SavepointCase):
                     'target': 'new',
                     'url': 'https://en.wikipedia.org/wiki/Discworld',
                     }
-        self.assertEquals(job_.related_action(), expected)
+        self.assertEqual(job_.related_action(), expected)

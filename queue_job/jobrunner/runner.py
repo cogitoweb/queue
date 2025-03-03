@@ -366,7 +366,7 @@ class QueueJobRunner(object):
         return db_names
 
     def close_databases(self, remove_jobs=True):
-        for db_name, db in self.db_by_name.items():
+        for db_name, db in list(self.db_by_name.items()):
             try:
                 if remove_jobs:
                     self.channel_manager.remove_db(db_name)
@@ -404,7 +404,7 @@ class QueueJobRunner(object):
                             job.uuid)
 
     def process_notifications(self):
-        for db in self.db_by_name.values():
+        for db in list(self.db_by_name.values()):
             while db.conn.notifies:
                 if self._stop:
                     break
@@ -417,13 +417,13 @@ class QueueJobRunner(object):
                     self.channel_manager.remove_job(uuid)
 
     def wait_notification(self):
-        for db in self.db_by_name.values():
+        for db in list(self.db_by_name.values()):
             if db.conn.notifies:
                 # something is going on in the queue, no need to wait
                 return
         # wait for something to happen in the queue_job tables
         # we'll select() on database connections and the stop pipe
-        conns = [db.conn for db in self.db_by_name.values()]
+        conns = [db.conn for db in list(self.db_by_name.values())]
         conns.append(self._stop_pipe[0])
         # look if the channels specify a wakeup time
         wakeup_time = self.channel_manager.get_wakeup_time()

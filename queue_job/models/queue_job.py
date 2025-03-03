@@ -17,7 +17,7 @@ _logger = logging.getLogger(__name__)
 
 
 def channel_func_name(method):
-    return '<%s>.%s' % (method.im_class._name, method.__name__)
+    return '<%s>.%s' % (method.__self__.__class__._name, method.__name__)
 
 
 class QueueJob(models.Model):
@@ -133,7 +133,7 @@ class QueueJob(models.Model):
             model = repr(self.env[record.model_name].browse(record_ids))
             args = [repr(arg) for arg in record.args]
             kwargs = ['%s=%r' % (key, val) for key, val
-                      in record.kwargs.iteritems()]
+                      in record.kwargs.items()]
             all_args = ', '.join(args + kwargs)
             record.func_string = (
                 "%s.%s(%s)" % (model, record.method_name, all_args)
@@ -167,11 +167,11 @@ class QueueJob(models.Model):
     @api.multi
     def action_done(self, reason=None):
         result = _(
-            u"Manually set to done by {}"
+            "Manually set to done by {}"
         ).format(self.env.user.name)
         if reason:
             result = _(
-                u"{} with reason: {}"
+                "{} with reason: {}"
             ).format(result, reason)
         self._change_job_state(DONE, result=result)
 

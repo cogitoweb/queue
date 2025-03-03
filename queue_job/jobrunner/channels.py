@@ -449,7 +449,7 @@ class Channel(object):
         return self.children.get(subchannel_name)
 
     def __str__(self):
-        capacity = u'∞' if self.capacity is None else str(self.capacity)
+        capacity = '∞' if self.capacity is None else str(self.capacity)
         return "%s(C:%s,Q:%d,R:%d,F:%d)" % (self.fullname,
                                             capacity,
                                             len(self._queue),
@@ -539,7 +539,7 @@ class Channel(object):
                  :class:`odoo.addons.queue_job.jobrunner.ChannelJob`
         """
         # enqueue jobs of children channels
-        for child in self.children.values():
+        for child in list(self.children.values()):
             for job in child.get_jobs_to_run(now):
                 self._queue.add(job)
         # is this channel paused?
@@ -586,7 +586,7 @@ class Channel(object):
             # run anyway because they would end up in this paused channel
             return wakeup_time
         wakeup_time = self._queue.get_wakeup_time(wakeup_time)
-        for child in self.children.values():
+        for child in list(self.children.values()):
             wakeup_time = child.get_wakeup_time(wakeup_time)
         return wakeup_time
 
@@ -1043,7 +1043,7 @@ class ChannelManager(object):
             del self._jobs_by_uuid[job.uuid]
 
     def remove_db(self, db_name):
-        for job in self._jobs_by_uuid.values():
+        for job in list(self._jobs_by_uuid.values()):
             if job.db_name == db_name:
                 job.channel.remove(job)
                 del self._jobs_by_uuid[job.uuid]

@@ -23,8 +23,8 @@ class TestJobChannels(common.TransactionCase):
         subchannel = self.channel_model.create({'name': 'five',
                                                 'parent_id': channel.id,
                                                 })
-        self.assertEquals(channel.complete_name, 'root.number')
-        self.assertEquals(subchannel.complete_name, 'root.number.five')
+        self.assertEqual(channel.complete_name, 'root.number')
+        self.assertEqual(subchannel.complete_name, 'root.number.five')
 
     def test_channel_tree(self):
         with self.assertRaises(exceptions.ValidationError):
@@ -60,16 +60,16 @@ class TestJobChannels(common.TransactionCase):
 
         method = self.env['test.queue.channel'].job_a
         self.env['queue.job.function']._register_job(method)
-        path_a = '<%s>.%s' % (method.im_class._name, method.__name__)
+        path_a = '<%s>.%s' % (method.__self__.__class__._name, method.__name__)
         job_func = self.function_model.search([('name', '=', path_a)])
-        self.assertEquals(job_func.channel, 'root')
+        self.assertEqual(job_func.channel, 'root')
 
         test_job = Job(method)
         test_job.store()
         stored = self.env['queue.job'].search([('uuid', '=', test_job.uuid)])
-        self.assertEquals(stored.channel, 'root')
+        self.assertEqual(stored.channel, 'root')
         job_read = Job.load(self.env, test_job.uuid)
-        self.assertEquals(job_read.channel, 'root')
+        self.assertEqual(job_read.channel, 'root')
 
         channel = self.channel_model.create(
             {'name': 'sub', 'parent_id': self.root_channel.id}
@@ -79,13 +79,13 @@ class TestJobChannels(common.TransactionCase):
         test_job = Job(method)
         test_job.store()
         stored = self.env['queue.job'].search([('uuid', '=', test_job.uuid)])
-        self.assertEquals(stored.channel, 'root.sub')
+        self.assertEqual(stored.channel, 'root.sub')
 
         # it's also possible to override the channel
         test_job = Job(method, channel='root.sub.sub.sub')
         test_job.store()
         stored = self.env['queue.job'].search([('uuid', '=', test_job.uuid)])
-        self.assertEquals(stored.channel, test_job.channel)
+        self.assertEqual(stored.channel, test_job.channel)
 
     def test_default_channel(self):
         self.env['queue.job.function'].search([]).unlink()
@@ -93,16 +93,16 @@ class TestJobChannels(common.TransactionCase):
 
         method = self.env['test.queue.channel'].job_sub_channel
         self.env['queue.job.function']._register_job(method)
-        self.assertEquals(method.default_channel, 'root.sub.subsub')
+        self.assertEqual(method.default_channel, 'root.sub.subsub')
 
-        path_a = '<%s>.%s' % (method.im_class._name, method.__name__)
+        path_a = '<%s>.%s' % (method.__self__.__class__._name, method.__name__)
         job_func = self.function_model.search([('name', '=', path_a)])
 
         channel = job_func.channel_id
-        self.assertEquals(channel.name, 'subsub')
-        self.assertEquals(channel.parent_id.name, 'sub')
-        self.assertEquals(channel.parent_id.parent_id.name, 'root')
-        self.assertEquals(job_func.channel, 'root.sub.subsub')
+        self.assertEqual(channel.name, 'subsub')
+        self.assertEqual(channel.parent_id.name, 'sub')
+        self.assertEqual(channel.parent_id.parent_id.name, 'root')
+        self.assertEqual(job_func.channel, 'root.sub.subsub')
 
     def test_job_decorator(self):
         """ Test the job decorator """
@@ -110,6 +110,6 @@ class TestJobChannels(common.TransactionCase):
         retry_pattern = {1: 5}
         partial = job(None, default_channel=default_channel,
                       retry_pattern=retry_pattern)
-        self.assertEquals(partial.keywords.get('default_channel'),
+        self.assertEqual(partial.keywords.get('default_channel'),
                           default_channel)
-        self.assertEquals(partial.keywords.get('retry_pattern'), retry_pattern)
+        self.assertEqual(partial.keywords.get('retry_pattern'), retry_pattern)
