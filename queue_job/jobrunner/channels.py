@@ -185,8 +185,8 @@ class ChannelJob(object):
 
     Comparison excluding eta:
 
-    >>> j1.cmp_no_eta(j2)
-    -1
+    >>> j1.sorting_key_ignoring_eta() < j2.sorting_key_ignoring_eta()
+    True
     """
 
     def __init__(self, db_name, channel, uuid,
@@ -208,19 +208,18 @@ class ChannelJob(object):
     def __hash__(self):
         return id(self)
 
-    def cmp_no_eta(self, other):
-        return (cmp(self.priority, other.priority) or
-                cmp(self.date_created, other.date_created) or
-                cmp(self.seq, other.seq))
+    def sorting_key(self):
+        return self.eta, self.priority, self.date_created, self.seq
 
-    def __cmp__(self, other):
+    def sorting_key_ignoring_eta(self):
+        return self.priority, self.date_created, self.seq
+
+    def __lt__(self, other):
         if self.eta and not other.eta:
-            return -1
+            return True
         elif not self.eta and other.eta:
-            return 1
-        else:
-            return (cmp(self.eta, other.eta) or
-                    self.cmp_no_eta(other))
+            return False
+        return self.sorting_key() < other.sorting_key()
 
 
 class ChannelQueue(object):
@@ -335,7 +334,7 @@ class ChannelQueue(object):
         if self.sequential and len(self._eta_queue) and len(self._queue):
             eta_job = self._eta_queue[0]
             job = self._queue[0]
-            if eta_job.cmp_no_eta(job) < 0:
+            if eta_job.sorting_key_ignoring_eta(job) < 0:
                 # eta ignored, the job with eta has higher priority
                 # than the job without eta; since it's a sequential
                 # queue we wait until eta
