@@ -138,11 +138,11 @@ def identity_exact(job_):
     model and method.
     """
     hasher = hashlib.sha1()
-    hasher.update(job_.model_name)
-    hasher.update(job_.method_name)
-    hasher.update(str(sorted(job_.recordset.ids)))
-    hasher.update(str(job_.args))
-    hasher.update(str(sorted(job_.kwargs.items())))
+    hasher.update(job_.model_name.encode('utf-8'))
+    hasher.update(job_.method_name.encode('utf-8'))
+    hasher.update(str(sorted(job_.recordset.ids)).encode('utf-8'))
+    hasher.update(str(job_.args).encode('utf-8'))
+    hasher.update(str(sorted(job_.kwargs.items())).encode('utf-8'))
 
     return hasher.hexdigest()
 
