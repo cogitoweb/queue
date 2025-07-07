@@ -4,6 +4,7 @@
 
 import os
 import logging
+import re
 from datetime import datetime, timedelta
 
 from odoo import models, fields, api, exceptions, _, SUPERUSER_ID
@@ -16,9 +17,8 @@ from ..fields import JobSerialized
 _logger = logging.getLogger(__name__)
 
 
-def channel_func_name(method):
-    return '<%s>.%s' % (method.__self__.__class__._name, method.__name__)
-
+def channel_func_name(model_name, method_name):
+    return "<{}>.{}".format(model_name, method_name)
 
 class QueueJob(models.Model):
     """ Job status and result """
@@ -218,7 +218,7 @@ class QueueJob(models.Model):
         tracking_disable = False if config_model and config_model.value == 'True' else True
 
         #handle corner case that can happen because Odoo DB connection management sucks
-        #a job that crashed due to DB connection issues will stay in 'started' mode indefinitely 
+        #a job that crashed due to DB connection issues will stay in 'started' mode indefinitely
         #and block the queue channel
         #if a job in 'started' state with the same worker_pid exists, it's certainly blocked due to the reason above, force requeue it
         #no need to check for different pid as the current job is not yet in started state ('write' operation happens below)
@@ -227,7 +227,7 @@ class QueueJob(models.Model):
             ('state', '=', STARTED),
             ('worker_pid', '=', vals.get('worker_pid')),
             ]
-            
+
             blocked_jobs = self.search(blocked_domain)
             for job in blocked_jobs:
                 # we don't use requeue() to prevent reset retry counter
@@ -235,7 +235,7 @@ class QueueJob(models.Model):
                 #unset pid
                 job.worker_pid = False
                 _logger.info("force requeue blocked job id %s, uuid %s, because a new job started with the same worker_pid %s" % (job.id, job.uuid, vals.get('worker_pid')))
-        
+
         self = self.with_context(tracking_disable=tracking_disable)
         res = super(QueueJob, self).write(vals)
 
@@ -432,7 +432,7 @@ class QueueJob(models.Model):
             ('state', '=', STARTED),
             ('date_started', '<', one_hour_ago)
         ])
-        
+
         for job in jobs_started_blocked_hour:
             _logger.info('JOB STUCK IN STARTED FOR MORE THAN ONE HOUR: %s' % job)
             # we don't use requeue() to prevent reset retry counter
@@ -440,10 +440,10 @@ class QueueJob(models.Model):
             #unset pid
             job.worker_pid = False
             _logger.info("force requeue job id %s, because it was stuck in 'started' state for more than one hour" % job.id)
-            
+
         return counter
 
-    def check_pid(self):        
+    def check_pid(self):
         """ Check For the existence of a unix pid. """
         try:
             os.kill(self.worker_pid, 0)
@@ -605,8 +605,8 @@ class JobFunction(models.Model):
         return channel
 
     @api.model
-    def _register_job(self, job_method):
-        func_name = channel_func_name(job_method)
+    def _register_job(self, model, job_method):
+        func_name = channel_func_name(model._name, job_method.__name__)
         if not self.search_count([('name', '=', func_name)]):
             channel = self._find_or_create_channel(job_method.default_channel)
             self.create({'name': func_name, 'channel_id': channel.id})
