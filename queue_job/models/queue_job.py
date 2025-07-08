@@ -119,7 +119,7 @@ class QueueJob(models.Model):
         for record in self:
             model = self.env[record.model_name]
             method = getattr(model, record.method_name)
-            channel_method_name = channel_func_name(method)
+            channel_method_name = channel_func_name(model._name, method.__name__)
             func_model = self.env['queue.job.function']
             function = func_model.search([('name', '=', channel_method_name)])
             record.channel_method_name = channel_method_name
