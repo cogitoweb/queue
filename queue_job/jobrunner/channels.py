@@ -334,7 +334,8 @@ class ChannelQueue(object):
         if self.sequential and len(self._eta_queue) and len(self._queue):
             eta_job = self._eta_queue[0]
             job = self._queue[0]
-            if eta_job.sorting_key_ignoring_eta(job) < 0:
+            if (eta_job.sorting_key_ignoring_eta() <
+                    job.sorting_key_ignoring_eta()):
                 # eta ignored, the job with eta has higher priority
                 # than the job without eta; since it's a sequential
                 # queue we wait until eta
@@ -993,15 +994,43 @@ class ChannelManager(object):
             parent = subchannel
         return parent
 
+    def autocreate_unconfigured_channel(self, channel_name):
+        """Create a channel that jobs use but the configuration does not list.
+
+        Such jobs used to fall in the root channel, sharing its whole capacity
+        with no limit of their own. The channel is now created under root with
+        a capacity of 1 (not parallel), the same default as a channel listed
+        without a capacity. Missing parents keep the unlimited capacity they
+        get when created from the configuration.
+
+        >>> cm = ChannelManager()
+        >>> cm.simple_configure('root:4,sub:2')
+        >>> c = cm.autocreate_unconfigured_channel('root.generic_print')
+        >>> c.fullname
+        'root.generic_print'
+        >>> c.capacity
+        1
+        >>> cm.get_channel_by_name('root.generic_print') is c
+        True
+        >>> c = cm.autocreate_unconfigured_channel('root.a.b')
+        >>> c.capacity
+        1
+        >>> cm.get_channel_by_name('root.a').capacity
+        >>> cm.get_channel_by_name('root.sub').capacity
+        2
+        """
+        channel = self.get_channel_by_name(channel_name, autocreate=True)
+        channel.capacity = 1
+        _logger.warning('channel %s is not configured: '
+                        'created with a capacity of 1', channel.fullname)
+        return channel
+
     def notify(self, db_name, channel_name, uuid,
                seq, date_created, priority, eta, state):
         try:
             channel = self.get_channel_by_name(channel_name)
         except ChannelNotFound:
-            _logger.warning('unknown channel %s, '
-                            'using root channel for job %s',
-                            channel_name, uuid)
-            channel = self._root_channel
+            channel = self.autocreate_unconfigured_channel(channel_name)
         job = self._jobs_by_uuid.get(uuid)
         if job:
             # db_name is invariant
