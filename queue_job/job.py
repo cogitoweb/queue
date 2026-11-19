@@ -549,7 +549,16 @@ class Job(object):
 
     @property
     def func(self):
-        recordset = self.recordset.with_context(job_uuid=self.uuid)
+        # A job is not a person reading the chatter: its user is not subscribed
+        # to the documents the job creates or posts on, and the followers of
+        # those documents are not notified of what the job writes. Recipients
+        # set explicitly on a message are still notified; the messages
+        # themselves (value tracking included) are written as usual.
+        recordset = self.recordset.with_context(
+            job_uuid=self.uuid,
+            mail_create_nosubscribe=True,
+            mail_notify_skip_followers=True,
+        )
         recordset = recordset.sudo(self.user_id)
         return getattr(recordset, self.method_name)
 
