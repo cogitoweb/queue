@@ -7,7 +7,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 
-from odoo import models, fields, api, exceptions, _, SUPERUSER_ID
+from odoo import models, fields, api, exceptions, tools, _, SUPERUSER_ID
 from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT, \
     DEFAULT_SERVER_DATE_FORMAT
 
@@ -121,7 +121,8 @@ class QueueJob(models.Model):
             method = getattr(model, record.method_name)
             channel_method_name = channel_func_name(model._name, method.__name__)
             func_model = self.env['queue.job.function']
-            function = func_model.search([('name', '=', channel_method_name)])
+            function = func_model.browse(
+                func_model._get_ids_by_name(channel_method_name))
             record.channel_method_name = channel_method_name
             record.job_function_id = function
 
@@ -197,11 +198,9 @@ class QueueJob(models.Model):
     @api.model
     def create(self, values):
 
-        # check global config
-        config_model = self.env['ir.config_parameter'].search(
-            [('key', '=', 'queue.job.tracking_enable')]
-        )
-        tracking_disable = False if config_model and config_model.value == 'True' else True
+        # check global config (get_param is cached: no query per job)
+        tracking_disable = self.env['ir.config_parameter'].sudo().get_param(
+            'queue.job.tracking_enable') != 'True'
 
         self = self.with_context(tracking_disable=tracking_disable)
         res = super(QueueJob, self).create(values)
@@ -211,11 +210,9 @@ class QueueJob(models.Model):
     @api.multi
     def write(self, vals):
 
-        # check global config
-        config_model = self.env['ir.config_parameter'].search(
-            [('key', '=', 'queue.job.tracking_enable')]
-        )
-        tracking_disable = False if config_model and config_model.value == 'True' else True
+        # check global config (get_param is cached: no query per job)
+        tracking_disable = self.env['ir.config_parameter'].sudo().get_param(
+            'queue.job.tracking_enable') != 'True'
 
         #handle corner case that can happen because Odoo DB connection management sucks
         #a job that crashed due to DB connection issues will stay in 'started' mode indefinitely
@@ -603,6 +600,35 @@ class JobFunction(models.Model):
                     'parent_id': parent_channel.id,
                 })
         return channel
+
+    @api.model
+    @tools.ormcache('name')
+    def _get_ids_by_name(self, name):
+        """Ids of the job functions with this name.
+
+        Looked up for every job created: job functions change only when a
+        module registers a new job or someone edits them, so the result is
+        cached and the cache is cleared on create, write and unlink.
+        """
+        return self.sudo().search([('name', '=', name)]).ids
+
+    @api.model
+    def create(self, vals):
+        record = super(JobFunction, self).create(vals)
+        self.clear_caches()
+        return record
+
+    @api.multi
+    def write(self, vals):
+        res = super(JobFunction, self).write(vals)
+        self.clear_caches()
+        return res
+
+    @api.multi
+    def unlink(self):
+        res = super(JobFunction, self).unlink()
+        self.clear_caches()
+        return res
 
     @api.model
     def _register_job(self, model, job_method):

@@ -337,7 +337,7 @@ class Job(object):
                     existing.uuid
                 )
                 return Job._load_from_db_record(existing)
-        new_job.store()
+        new_job.store(new=True)
         _logger.debug(
             "enqueued %s:%s(*%r, **%r) with uuid: %s",
             new_job.recordset,
@@ -486,8 +486,12 @@ class Job(object):
             raise
         return self.result
 
-    def store(self):
-        """ Store the Job """
+    def store(self, new=False):
+        """ Store the Job
+
+        :param new: the job was just built and cannot be in the database yet:
+                    skip the lookup by uuid
+        """
         vals = {'state': self.state,
                 'priority': self.priority,
                 'retry': self.retry,
@@ -517,7 +521,7 @@ class Job(object):
         if self.worker_pid:
             vals['worker_pid'] = self.worker_pid
 
-        db_record = self.db_record()
+        db_record = None if new else self.db_record()
         if db_record:
             db_record.write(vals)
         else:
